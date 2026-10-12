@@ -27,8 +27,8 @@ providers:
 Then, without pulling this repository:
 
 ```bash
-clusterctl init --infrastructure vates:v1.1.0-rc1
-clusterctl generate cluster my-cluster --infrastructure vates:v1.1.0-rc1 \
+clusterctl init --infrastructure vates:v1.1.0-rc2
+clusterctl generate cluster my-cluster --infrastructure vates:v1.1.0-rc2 \
   --control-plane-machine-count 3 --worker-machine-count 2
 ```
 
@@ -40,7 +40,7 @@ The controller image referenced by `infrastructure-components.yaml` must be
 pullable by the management cluster:
 
 ```bash
-export IMG=ghcr.io/vatesfr/cluster-api-provider-vates:v1.1.0-rc1
+export IMG=ghcr.io/vatesfr/cluster-api-provider-vates:v1.1.0-rc2
 make docker-build docker-push IMG=$IMG
 ```
 
@@ -55,7 +55,7 @@ This produces `dist/infrastructure-components.yaml`, `dist/metadata.yaml` and
 
 ### 3. Create the GitHub release
 
-- Tag the release with a **valid semantic version** (e.g. `v1.1.0-rc1`).
+- Tag the release with a **valid semantic version** (e.g. `v1.1.0-rc2`).
 - Attach the three files from `dist/` as release assets:
   `infrastructure-components.yaml`, `metadata.yaml`, `cluster-template.yaml`.
 - Click **Generate release notes**: GitHub groups the merged pull requests by
@@ -75,14 +75,14 @@ make -f Makefile.dev dev-overrides     # refresh overrides from dist/
 ```
 
 This regenerates `dist/` and copies the three assets into
-`~/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc1/`.
+`~/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc2/`.
 
 ## Caveats
 
 - **Version detection uses the Go proxy.** `clusterctl` detects available
   provider versions via `proxy.golang.org`. While the module is not published
   there, version detection may fail; workarounds: set `GOPROXY=off` /
-  `GOPROXY=direct`, or pin the version explicitly (`vates:v1.1.0-rc1`).
+  `GOPROXY=direct`, or pin the version explicitly (`vates:v1.1.0-rc2`).
 - **Not in the pre-defined provider list.** Until vates is added to
   `clusterctl`'s built-in provider list (PR to `kubernetes-sigs/cluster-api`),
   users must register the provider in `clusterctl.yaml` as shown above.
