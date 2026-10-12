@@ -18,9 +18,11 @@ resources:
 - metrics_auth_role.yaml
 - metrics_auth_role_binding.yaml
 - metrics_reader_role.yaml
-# Bind the manager-role to the KCP controller's service account
-# (capi-kubeadm-control-plane-system namespace, not transformed by kustomize)
-- kcp-binding.yaml
+# Aggregate role for the KCP controller: grants it read access to our machine
+# templates/machines via the CAPI kubeadm control-plane aggregation label.
+# (A cross-namespace ClusterRoleBinding does not survive clusterctl, which
+# rewrites binding subject namespaces to the provider namespace.)
+- kcp_aggregate_role.yaml
 # Talos bindings (CACPPT/CABPT) are NOT included here by default.
 # Apply config/rbac/talos separately when using the Talos bootstrap flow.
 # Aggregate role: allows the CAPI manager (capi-system) to watch our types

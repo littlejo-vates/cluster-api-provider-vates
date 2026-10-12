@@ -1,0 +1,26 @@
+---
+# Grants the KubeadmControlPlane controller read access to our machine
+# templates/machines. The kubeadm control-plane manager role aggregates every
+# ClusterRole carrying the label below, so no cross-namespace ClusterRoleBinding
+# is needed (clusterctl rewrites binding subject namespaces to the provider
+# namespace, which silently breaks such bindings).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    kubeadm.controlplane.cluster.x-k8s.io/aggregate-to-manager: "true"
+  name: kcp-aggregate-role
+rules:
+- apiGroups:
+  - vates.infrastructure.cluster.x-k8s.io
+  resources:
+  - xomachines
+  - xomachinetemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
