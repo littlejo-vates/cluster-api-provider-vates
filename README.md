@@ -75,7 +75,7 @@ add the entry manually:
 providers:
   - name: vates
     type: InfrastructureProvider
-    url: file://${HOME}/.config/cluster-api/overrides/infrastructure-vates/v0.1.0/infrastructure-components.yaml
+    url: file://${HOME}/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc1/infrastructure-components.yaml
 ```
 
 For a **published release**, register the GitHub release instead (no repo clone
@@ -91,8 +91,8 @@ providers:
 Then:
 
 ```bash
-clusterctl init --infrastructure vates:v0.1.0
-clusterctl generate cluster my-cluster --infrastructure vates:v0.1.0 \
+clusterctl init --infrastructure vates:v1.1.0-rc1
+clusterctl generate cluster my-cluster --infrastructure vates:v1.1.0-rc1 \
   --control-plane-machine-count 3 --worker-machine-count 2
 ```
 
