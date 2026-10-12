@@ -58,11 +58,11 @@ restart:
 .PHONY: dev-overrides
 dev-overrides:
 	$(MAKE) release-manifests IMG=$(IMG)
-	@mkdir -p "$(HOME)/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc2"
-	@cp dist/infrastructure-components.yaml dist/metadata.yaml dist/cluster-template.yaml "$(HOME)/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc2/"
+	@mkdir -p "$(HOME)/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc3"
+	@cp dist/infrastructure-components.yaml dist/metadata.yaml dist/cluster-template.yaml "$(HOME)/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc3/"
 	@if [ ! -f "$(HOME)/.config/cluster-api/clusterctl.yaml" ]; then \
 		echo "Creating $(HOME)/.config/cluster-api/clusterctl.yaml"; \
-		{ echo 'providers:'; echo '  - name: vates'; echo '    type: InfrastructureProvider'; echo "    url: file://\$${HOME}/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc2/infrastructure-components.yaml"; } > "$(HOME)/.config/cluster-api/clusterctl.yaml"; \
+		{ echo 'providers:'; echo '  - name: vates'; echo '    type: InfrastructureProvider'; echo "    url: file://\$${HOME}/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc3/infrastructure-components.yaml"; } > "$(HOME)/.config/cluster-api/clusterctl.yaml"; \
 	elif ! grep -q 'name: vates' "$(HOME)/.config/cluster-api/clusterctl.yaml"; then \
 		echo "WARNING: vates provider not registered in $(HOME)/.config/cluster-api/clusterctl.yaml — add it manually (see README)"; \
 	fi
