@@ -108,13 +108,14 @@ spec:
   controlPlaneConfig:
     controlplane:
       generateType: controlplane
+      talosVersion: ${TALOS_VERSION}
       strategicPatches:
         - |
           machine:
             time:
               servers:
                 - time.cloudflare.com
-                - pool.ntp.org
+                - time.google.com
             network:
               interfaces:
                 - interface: eth0
@@ -145,7 +146,7 @@ spec:
             time:
               servers:
                 - time.cloudflare.com
-                - pool.ntp.org
+                - time.google.com
         # kubelet is a standalone document since Talos 1.12: patching
         # machine.kubelet here makes the whole config invalid
         # ("kubelet config is already set in v1alpha1 config").

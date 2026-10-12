@@ -2,7 +2,12 @@ name: Test Chart
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions: {}
 
@@ -24,6 +29,14 @@ jobs:
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
+
+      - name: Cache tool binaries
+        uses: actions/cache@v6
+        with:
+          path: bin
+          key: ${{ runner.os }}-tools-${{ hashFiles('Makefile', '.custom-gcl.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-tools-
 
       - name: Install the latest version of kind
         run: |
@@ -113,6 +126,14 @@ jobs:
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
+
+      - name: Cache tool binaries
+        uses: actions/cache@v6
+        with:
+          path: bin
+          key: ${{ runner.os }}-tools-${{ hashFiles('Makefile', '.custom-gcl.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-tools-
 
       - name: Install Helm
         run: make install-helm
