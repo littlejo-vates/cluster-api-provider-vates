@@ -115,8 +115,8 @@ Then register the provider in `clusterctl.yaml` (see the README section
 *Installing the provider with clusterctl*) and use:
 
 ```bash
-clusterctl init --infrastructure vates:v0.1.0
-clusterctl generate cluster my-cluster --infrastructure vates:v0.1.0 \
+clusterctl init --infrastructure vates:v1.1.0-rc1
+clusterctl generate cluster my-cluster --infrastructure vates:v1.1.0-rc1 \
   --control-plane-machine-count 3 --worker-machine-count 2
 ```
 
