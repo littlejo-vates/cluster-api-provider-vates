@@ -240,16 +240,23 @@ spec:
               servers:
                 - time.cloudflare.com
                 - time.google.com
-            kubelet:
-              extraArgs:
-                cloud-provider: external
             network:
               interfaces:
                 - interface: eth0
                   dhcp: true
                   vip:
                     ip: <your-cp-vip>
+        - |
+          apiVersion: v1alpha1
+          kind: KubeletConfig
+          extraArgs:
+            cloud-provider: external
 ```
+
+The kubelet lives in its own document since Talos 1.12. Patching
+`machine.kubelet` here is rejected by Talos at boot with
+`kubelet config is already set in v1alpha1 config`, and the node stops
+before starting any service.
 
 `patch-xocluster.yaml` — the cluster's control plane endpoint (**replace the
 VIP and subnet with yours**):
@@ -346,7 +353,7 @@ The base templates apply the following `strategicPatches`:
 |---|---|
 | `machine.time.servers` | Use `time.cloudflare.com` / `time.google.com` instead of the default NTP server; some servers (e.g. `pool.ntp.org`) answer "kiss of death" on some networks |
 | `machine.network.interfaces[].vip` | Talos native shared IP (control plane VIP) — **not** kube-vip |
-| `machine.kubelet.extraArgs.cloud-provider: external` | Offload node initialization to the Xen Orchestra CCM, which sets the `providerID` required by CAPI |
+| `KubeletConfig.extraArgs.cloud-provider: external` | Offload node initialization to the Xen Orchestra CCM, which sets the `providerID` required by CAPI |
 
 > `TalosControlPlane.spec.controlPlaneConfig.controlplane.talosVersion` **must**
 > be set to the Talos version of the image. Without it, CABPT generates a config
