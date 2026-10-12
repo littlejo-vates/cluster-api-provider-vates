@@ -79,17 +79,49 @@ type XOMachineSpec struct {
 // there is no provider name and no per-provider code path. The zero value is a
 // full pass-through.
 type BootstrapBehavior struct {
-	// CloudInit reports that the payload is a cloud-init document, which may be
-	// enriched: the SSH keys of the XO user profile are merged in.
+	// Format is the format of the bootstrap payload, and therefore how the
+	// infrastructure provider may treat it:
+	//
+	//   - "passthrough" (default): deliver the payload untouched. Use it for
+	//     any bootstrap provider whose payload must not be interpreted, e.g.
+	//     Talos.
+	//   - "cloudinit": the payload is a cloud-init document, which may be
+	//     enriched: the XO user's SSH keys are merged in when the cluster sets
+	//     injectSSHKeys, and kube-vip is injected when the cluster sets
+	//     controlPlaneLB: kube-vip and the machine is a control plane node.
+	//
+	// An empty value is treated as "passthrough".
+	// +optional
+	// +kubebuilder:validation:Enum=passthrough;cloudinit
+	Format string `json:"format,omitempty"`
+
+	// CloudInit is deprecated and will be removed in v1.2; use Format instead.
+	//
+	// Deprecated: set Format to "cloudinit". Kept for backward compatibility:
+	// when Format is empty and CloudInit is true, the payload is treated as
+	// cloud-init.
+	// TODO(v1.2): remove CloudInit (superseded by Format).
 	// +optional
 	CloudInit bool `json:"cloudInit,omitempty"`
 
-	// KubeVIP reports that kube-vip may be injected into the payload. It only
-	// applies to a kubeadm-style cloud-init control plane, so it is ignored
-	// unless CloudInit is true.
+	// KubeVIP is deprecated and will be removed in v1.2; it has no effect.
+	//
+	// Deprecated: kube-vip injection is driven by the cluster policy
+	// (XOCluster.spec.controlPlaneLB: kube-vip) and the machine role, not by
+	// this flag.
+	// TODO(v1.2): remove KubeVIP (superseded by cluster policy).
 	// +optional
 	KubeVIP bool `json:"kubeVIP,omitempty"`
 }
+
+// Bootstrap payload formats accepted by BootstrapBehavior.Format.
+const (
+	// BootstrapFormatPassthrough delivers the bootstrap payload untouched.
+	BootstrapFormatPassthrough = "passthrough"
+	// BootstrapFormatCloudInit treats the bootstrap payload as a cloud-init
+	// document, which may be enriched.
+	BootstrapFormatCloudInit = "cloudinit"
+)
 
 type NetworkConfig struct {
 	// AllowedIPRange is a CIDR range of IPs allowed to access the VM (e.g. "10.30.139.0/24").

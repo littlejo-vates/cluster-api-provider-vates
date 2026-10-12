@@ -166,10 +166,15 @@ func bootstrapBehavior(xoMachine *infrastructurev1beta2.XOMachine) bootstrap.Beh
 	if xoMachine.Spec.Bootstrap == nil {
 		return bootstrap.Behavior{}
 	}
-	return bootstrap.Behavior{
-		CloudInit: xoMachine.Spec.Bootstrap.CloudInit,
-		KubeVIP:   xoMachine.Spec.Bootstrap.KubeVIP,
+	format := xoMachine.Spec.Bootstrap.Format
+	// Deprecated: derive the format from the legacy CloudInit flag when Format
+	// is unset, so objects written before Format existed keep working.
+	// TODO(v1.2): remove this fallback together with the CloudInit field.
+	//nolint:staticcheck // Intentional use of the deprecated field, removed in v1.2.
+	if format == "" && xoMachine.Spec.Bootstrap.CloudInit {
+		format = infrastructurev1beta2.BootstrapFormatCloudInit
 	}
+	return bootstrap.Behavior{Format: format}
 }
 
 func (r *XOMachineReconciler) buildVMName(xoMachine *infrastructurev1beta2.XOMachine, bsResult bootstrap.ResolveBootstrapDataResult) string {
