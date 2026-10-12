@@ -8,20 +8,25 @@ on XenServer / XCP-ng pools as Kubernetes worker and control plane nodes.
 
 > **Prerequisites:** A management cluster (Kind, k3s, etc.), [clusterctl](https://cluster-api.sigs.k8s.io/clusterctl/overview.html), Xen Orchestra access (VM template UUID, pool UUID, network name).
 
-### 1. Install CAPI and the vates provider
+### 1. Install the providers
+
+Create the XO credentials secret **first**: the vates provider reads it at
+startup and exits if it is missing. The secret lives in the provider namespace
+(`capi-system`), so create that namespace beforehand.
 
 ```bash
-# 1. Install CAPI
-clusterctl init --bootstrap kubeadm --control-plane kubeadm
-
-# 2. Deploy the vates provider
-kubectl apply -f https://raw.githubusercontent.com/vatesfr/cluster-api-provider-vates/refs/heads/main/dist/install.yaml
-
-# 3. Create the XO credentials secret
+# 1. Create the provider namespace and the XO credentials secret
+kubectl create namespace capi-system
 kubectl create secret generic xo-credentials -n capi-system \
   --from-literal=url="https://<your-xoa>" \
   --from-literal=token="<your-xo-token>" \
   --from-literal=insecure="true"
+
+# 2. Install CAPI core + the kubeadm bootstrap/control-plane providers
+clusterctl init --bootstrap kubeadm --control-plane kubeadm
+
+# 3. Deploy the vates infrastructure provider
+kubectl apply -f https://raw.githubusercontent.com/vatesfr/cluster-api-provider-vates/refs/heads/main/dist/install.yaml
 ```
 
 ### 2. Create a cluster
@@ -88,9 +93,16 @@ providers:
     type: InfrastructureProvider
 ```
 
-Then:
+Then create the XO credentials secret (the vates provider reads it at startup)
+and initialize the providers:
 
 ```bash
+kubectl create namespace capi-system
+kubectl create secret generic xo-credentials -n capi-system \
+  --from-literal=url="https://<your-xoa>" \
+  --from-literal=token="<your-xo-token>" \
+  --from-literal=insecure="true"
+
 clusterctl init --infrastructure vates:v1.1.0-rc1
 clusterctl generate cluster my-cluster --infrastructure vates:v1.1.0-rc1 \
   --control-plane-machine-count 3 --worker-machine-count 2
