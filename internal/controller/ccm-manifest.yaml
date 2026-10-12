@@ -75,6 +75,10 @@ spec:
         app.kubernetes.io/name: xenorchestra-cloud-controller-manager
     spec:
       serviceAccountName: xenorchestra-cloud-controller-manager
+      # Run on the host network so the CCM can start before the CNI is up and
+      # break the cloud-provider=external bootstrap deadlock (node addresses /
+      # providerID are only set by the CCM).
+      hostNetwork: true
       dnsPolicy: None
       dnsConfig:
         nameservers:
@@ -121,6 +125,12 @@ spec:
           operator: Exists
         - effect: NoSchedule
           key: node.cilium.io/agent-not-ready
+          operator: Exists
+        - effect: NoSchedule
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+        - effect: NoSchedule
+          key: node.cluster.x-k8s.io/uninitialized
           operator: Exists
         - effect: NoExecute
           operator: Exists
