@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 370" width="100%" role="img" aria-label="Cluster API and its providers: the kubeadm and Talos bootstrap and control plane providers converge on the vates-capi infrastructure provider, which talks to the Xen Orchestra API to create VMs, the cluster's nodes.">
+  <style>
+    .box { fill: currentColor; fill-opacity: 0.05; stroke: currentColor; stroke-width: 1.5; }
+    .grp { fill: none; stroke: currentColor; stroke-width: 1; stroke-dasharray: 6 6; opacity: 0.4; }
+    .lbl { fill: currentColor; font-family: inherit; font-size: 15px; }
+    .strong { font-weight: 600; }
+    .cap { fill: currentColor; font-size: 12.5px; opacity: 0.6; letter-spacing: 0.06em; }
+    .line { stroke: currentColor; stroke-width: 1.6; opacity: 0.75; fill: none; }
+    .tip { fill: currentColor; opacity: 0.75; }
+  </style>
+  <defs>
+    <path id="ah" d="M0,-4 L7,0 L0,4 Z"/>
+  </defs>
+  <rect class="grp" x="20" y="52" width="336" height="300" rx="16"/>
+  <text class="cap" x="36" y="40">CLUSTER API — MANAGEMENT CLUSTER</text>
+  <rect class="box" x="40" y="72" width="290" height="56" rx="10"/>
+  <text class="lbl" x="185" y="106" text-anchor="middle">Kubeadm control plane provider</text>
+  <rect class="box" x="40" y="142" width="290" height="56" rx="10"/>
+  <text class="lbl" x="185" y="176" text-anchor="middle">Kubeadm bootstrap provider</text>
+  <rect class="box" x="40" y="212" width="290" height="56" rx="10"/>
+  <text class="lbl" x="185" y="246" text-anchor="middle">Talos control plane provider</text>
+  <rect class="box" x="40" y="282" width="290" height="56" rx="10"/>
+  <text class="lbl" x="185" y="316" text-anchor="middle">Talos bootstrap provider</text>
+  <line class="line" x1="330" y1="100" x2="423" y2="100"/>
+  <use class="tip" href="#ah" x="423" y="100"/>
+  <line class="line" x1="330" y1="170" x2="423" y2="170"/>
+  <use class="tip" href="#ah" x="423" y="170"/>
+  <line class="line" x1="330" y1="240" x2="423" y2="240"/>
+  <use class="tip" href="#ah" x="423" y="240"/>
+  <line class="line" x1="330" y1="310" x2="423" y2="310"/>
+  <use class="tip" href="#ah" x="423" y="310"/>
+  <rect class="box" x="430" y="72" width="170" height="266" rx="16"/>
+  <text class="lbl strong" x="0" y="0" text-anchor="middle" transform="translate(505,196) rotate(-90)">vates-capi</text>
+  <text class="lbl" x="0" y="0" text-anchor="middle" transform="translate(527,196) rotate(-90)" opacity="0.7">infrastructure provider</text>
+  <line class="line" x1="600" y1="205" x2="653" y2="205"/>
+  <use class="tip" href="#ah" x="653" y="205"/>
+  <rect class="box" x="660" y="120" width="150" height="170" rx="16"/>
+  <text class="lbl" x="0" y="0" text-anchor="middle" transform="translate(735,205) rotate(-90)">Xen Orchestra API</text>
+  <line class="line" x1="810" y1="205" x2="840" y2="205"/>
+  <line class="line" x1="840" y1="120" x2="840" y2="290"/>
+  <line class="line" x1="840" y1="120" x2="863" y2="120"/>
+  <use class="tip" href="#ah" x="863" y="120"/>
+  <line class="line" x1="840" y1="205" x2="863" y2="205"/>
+  <use class="tip" href="#ah" x="863" y="205"/>
+  <line class="line" x1="840" y1="290" x2="863" y2="290"/>
+  <use class="tip" href="#ah" x="863" y="290"/>
+  <rect class="box" x="870" y="94" width="100" height="52" rx="10"/>
+  <rect class="line" x="884" y="112" width="24" height="16" rx="2"/>
+  <line class="line" x1="896" y1="128" x2="896" y2="133"/>
+  <line class="line" x1="889" y1="133" x2="903" y2="133"/>
+  <text class="lbl" x="920" y="125">VM</text>
+  <rect class="box" x="870" y="179" width="100" height="52" rx="10"/>
+  <rect class="line" x="884" y="197" width="24" height="16" rx="2"/>
+  <line class="line" x1="896" y1="213" x2="896" y2="218"/>
+  <line class="line" x1="889" y1="218" x2="903" y2="218"/>
+  <text class="lbl" x="920" y="210">VM</text>
+  <rect class="box" x="870" y="264" width="100" height="52" rx="10"/>
+  <rect class="line" x="884" y="282" width="24" height="16" rx="2"/>
+  <line class="line" x1="896" y1="298" x2="896" y2="303"/>
+  <line class="line" x1="889" y1="303" x2="903" y2="303"/>
+  <text class="lbl" x="920" y="295">VM</text>
+</svg>
