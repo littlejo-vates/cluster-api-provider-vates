@@ -80,7 +80,7 @@ add the entry manually:
 providers:
   - name: vates
     type: InfrastructureProvider
-    url: file://${HOME}/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc3/infrastructure-components.yaml
+    url: file://${HOME}/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc4/infrastructure-components.yaml
 ```
 
 For a **published release**, register the GitHub release instead (no repo clone
@@ -103,8 +103,8 @@ kubectl create secret generic xo-credentials -n capi-system \
   --from-literal=token="<your-xo-token>" \
   --from-literal=insecure="true"
 
-clusterctl init --infrastructure vates:v1.1.0-rc3
-clusterctl generate cluster my-cluster --infrastructure vates:v1.1.0-rc3 \
+clusterctl init --infrastructure vates:v1.1.0-rc4
+clusterctl generate cluster my-cluster --infrastructure vates:v1.1.0-rc4 \
   --control-plane-machine-count 3 --worker-machine-count 2
 ```
 

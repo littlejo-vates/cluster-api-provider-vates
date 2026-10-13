@@ -73,7 +73,7 @@ If an existing `~/.config/cluster-api/clusterctl.yaml` does not register vates
 ```yaml
 providers:
   - name: vates
-    url: file://${HOME}/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc3/infrastructure-components.yaml
+    url: file://${HOME}/.config/cluster-api/overrides/infrastructure-vates/v1.1.0-rc4/infrastructure-components.yaml
     type: InfrastructureProvider
 ```
 

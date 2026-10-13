@@ -4,7 +4,7 @@ description: A Helm chart to distribute vates-capi
 type: application
 
 version: 1.1.0
-appVersion: "v1.1.0-rc3"
+appVersion: "v1.1.0-rc4"
 
 keywords:
   - kubernetes
