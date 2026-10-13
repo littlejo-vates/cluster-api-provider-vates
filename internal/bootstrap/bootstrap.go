@@ -41,13 +41,10 @@ type Dependencies struct {
 // provider name and no per-provider code path. The zero value is a full
 // pass-through.
 type Behavior struct {
-	// CloudInit reports that the payload is a cloud-init document, which may be
-	// enriched (the XO user's SSH keys are merged in).
-	CloudInit bool
-	// KubeVIP reports that kube-vip may be injected into the payload. It only
-	// applies to a kubeadm-style cloud-init control plane, so it is ignored
-	// unless CloudInit is set.
-	KubeVIP bool
+	// Format is the declared payload format (see the
+	// infrastructurev1beta2.BootstrapFormat* constants). Empty means
+	// pass-through.
+	Format string
 }
 
 // Result is the pair of payloads handed to Xen Orchestra when creating the VM.
@@ -67,18 +64,19 @@ type Result struct {
 func Build(ctx context.Context, deps Dependencies, behavior Behavior) (Result, error) {
 	cloudConfig := string(deps.BootstrapData)
 
-	if behavior.CloudInit {
+	if behavior.Format == infrastructurev1beta2.BootstrapFormatCloudInit {
 		injectSSHKeys := resolveInjectSSHKeys(ctx, deps.Client, deps.Machine, deps.XOMachine)
 		var err error
 		cloudConfig, err = BuildCloudInitWithSSHKeys(ctx, deps.XOClient, []byte(cloudConfig), injectSSHKeys)
 		if err != nil {
 			return Result{}, err
 		}
-		if behavior.KubeVIP {
-			cloudConfig, err = injectKubeVIPIfNeeded(ctx, deps.Client, cloudConfig, deps.Machine, deps.XOMachine)
-			if err != nil {
-				return Result{}, err
-			}
+		// kube-vip injection is not gated here: whether it happens is decided
+		// by the cluster policy (XOCluster.spec.controlPlaneLB) and the
+		// control plane role, both checked inside injectKubeVIPIfNeeded.
+		cloudConfig, err = injectKubeVIPIfNeeded(ctx, deps.Client, cloudConfig, deps.Machine, deps.XOMachine)
+		if err != nil {
+			return Result{}, err
 		}
 	}
 

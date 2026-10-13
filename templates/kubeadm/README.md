@@ -172,12 +172,12 @@ spec:
 ```
 
 > **`spec.bootstrap`** — the `base/` `XOMachineTemplate`s set
-> `bootstrap: {cloudInit: true, kubeVIP: true}`. This is what lets the provider
-> enrich the kubeadm cloud-init: `cloudInit` allows merging the XO user's SSH
-> keys (only when the `XOCluster` sets `injectSSHKeys: true`), and `kubeVIP`
-> allows injecting kube-vip (only when the `XOCluster` sets
-> `controlPlaneLB: kube-vip`). **Keep it when you copy or derive a template**:
-> with no `spec.bootstrap`, the payload is passed through untouched and neither
+> `bootstrap: {format: cloudinit}`. This declares the payload as cloud-init, which
+> lets the provider enrich it: the XO user's SSH keys are merged in when the
+> `XOCluster` sets `injectSSHKeys: true`, and kube-vip is injected when the
+> `XOCluster` sets `controlPlaneLB: kube-vip` (control plane nodes only). **Keep
+> it when you copy or derive a template**: with no `spec.bootstrap` (or
+> `format: passthrough`), the payload is passed through untouched and neither
 > happens.
 
 `patch-cluster.yaml` — the cluster topology: control plane endpoint, machine

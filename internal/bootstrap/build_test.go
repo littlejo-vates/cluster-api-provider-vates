@@ -42,12 +42,12 @@ var _ = Describe("Build", func() {
 		Expect(*result.NetworkConfig).To(Equal("network: {version: 2}"))
 	})
 
-	It("does not touch a non-cloud-init payload even when KubeVIP is requested", func() {
+	It("leaves a passthrough payload untouched", func() {
 		deps := Dependencies{
 			XOMachine:     &infrastructurev1beta2.XOMachine{},
 			BootstrapData: []byte("version: v1alpha1\nmachine:\n  type: controlplane\n"),
 		}
-		result, err := Build(context.Background(), deps, Behavior{CloudInit: false, KubeVIP: true})
+		result, err := Build(context.Background(), deps, Behavior{Format: infrastructurev1beta2.BootstrapFormatPassthrough})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(result.CloudConfig).To(Equal("version: v1alpha1\nmachine:\n  type: controlplane\n"))
 	})
@@ -102,8 +102,66 @@ var _ = Describe("Build", func() {
 			},
 		}
 
-		result, err := Build(context.Background(), deps, Behavior{CloudInit: true})
+		result, err := Build(context.Background(), deps, Behavior{Format: infrastructurev1beta2.BootstrapFormatCloudInit})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(result.CloudConfig).To(ContainSubstring("ssh-rsa AAA test"))
 	})
+
+	It("injects kube-vip from the cluster policy, with no machine-level flag", func() {
+		result, err := Build(context.Background(), kubeVIPTestDeps(), Behavior{Format: infrastructurev1beta2.BootstrapFormatCloudInit})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.CloudConfig).To(ContainSubstring("kube-vip-pre.sh"))
+		Expect(result.CloudConfig).To(ContainSubstring(kubeVIPTestVIP))
+	})
+
+	It("leaves a passthrough payload untouched even when the cluster uses kube-vip", func() {
+		result, err := Build(context.Background(), kubeVIPTestDeps(), Behavior{Format: infrastructurev1beta2.BootstrapFormatPassthrough})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.CloudConfig).NotTo(ContainSubstring("kube-vip"))
+	})
 })
+
+const kubeVIPTestVIP = "192.168.1.240"
+
+// kubeVIPTestDeps returns Dependencies for a control plane Machine whose cluster
+// requests kube-vip. The payload is a minimal kubeadm cloud-config.
+func kubeVIPTestDeps() Dependencies {
+	scheme := runtime.NewScheme()
+	_ = clusterv1.AddToScheme(scheme)
+	_ = infrastructurev1beta2.AddToScheme(scheme)
+
+	lb := "kube-vip"
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		&clusterv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+			Spec: clusterv1.ClusterSpec{
+				InfrastructureRef: clusterv1.ContractVersionedObjectReference{Kind: "XOCluster", Name: "demo-xo"},
+			},
+		},
+		&infrastructurev1beta2.XOCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo-xo", Namespace: "default"},
+			Spec: infrastructurev1beta2.XOClusterSpec{
+				ControlPlaneLB:       &lb,
+				ControlPlaneEndpoint: &infrastructurev1beta2.APIEndpoint{Host: kubeVIPTestVIP, Port: 6443},
+			},
+		},
+	).Build()
+
+	return Dependencies{
+		Client:        fakeClient,
+		BootstrapData: []byte("#cloud-config\nruncmd:\n  - kubeadm init --config /etc/kubernetes/kubeadm-config.yaml\n"),
+		Machine: &clusterv1.Machine{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "demo-cp",
+				Namespace: "default",
+				Labels: map[string]string{
+					"cluster.x-k8s.io/cluster-name":    "demo",
+					clusterv1.MachineControlPlaneLabel: "",
+				},
+			},
+		},
+		XOMachine: &infrastructurev1beta2.XOMachine{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo-cp", Namespace: "default"},
+		},
+	}
+}
