@@ -37,3 +37,7 @@ notes/
 
 # Local environment overlays (real XO resource UUIDs — not for distribution)
 templates/*/overlays/
+
+# Documentation build output and local tooling
+site/
+.venv/
