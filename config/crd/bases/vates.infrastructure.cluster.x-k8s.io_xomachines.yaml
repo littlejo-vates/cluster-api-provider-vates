@@ -140,6 +140,54 @@ spec:
                 description: NetworkConfig specifies the network configuration for
                   the VM.
                 properties:
+                  addressesFromPools:
+                    description: |-
+                      AddressesFromPools asks Cluster API's IPAM integration for an address for
+                      this machine, from the pools named here. It is the standard spelling:
+                      an IPAddressClaim is created from each pool, an IPAM provider answers with
+                      an IPAddress, and the address is rendered into the guest's network
+                      configuration as a netplan document -- so the node boots on an address the
+                      provider chose rather than on whatever a DHCP server happens to hand out.
+
+                      A control plane's identity is tied to its address -- etcd records the peer
+                      URL it joined with -- which is why this exists: a lease that can move is a
+                      control plane that can be lost on the next reboot.
+
+                      When set, it wins over GuestConfig: the pool is the answer to "which
+                      address", and there is only one answer.
+                    items:
+                      description: IPPoolReference is a reference to an IPPool.
+                      properties:
+                        apiGroup:
+                          description: |-
+                            apiGroup of the IPPool.
+                            apiGroup must be fully qualified domain name.
+                          maxLength: 253
+                          minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                          type: string
+                        kind:
+                          description: |-
+                            kind of the IPPool.
+                            kind must consist of alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character.
+                          maxLength: 63
+                          minLength: 1
+                          pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
+                          type: string
+                        name:
+                          description: |-
+                            name of the IPPool.
+                            name must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character.
+                          maxLength: 253
+                          minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                          type: string
+                      required:
+                      - apiGroup
+                      - kind
+                      - name
+                      type: object
+                    type: array
                   allowedIPRange:
                     description: |-
                       AllowedIPRange is a CIDR range of IPs allowed to access the VM (e.g. "10.30.139.0/24").
