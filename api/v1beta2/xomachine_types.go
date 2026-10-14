@@ -3,6 +3,7 @@ package v1beta2
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ipamv1 "sigs.k8s.io/cluster-api/api/ipam/v1beta2"
 )
 
 // XOMachineSpec defines the desired state of a Xen Orchestra VM.
@@ -132,6 +133,22 @@ type NetworkConfig struct {
 	// Networks is a list of networks to attach to the VM.
 	// +optional
 	Networks []Network `json:"networks,omitempty"`
+
+	// AddressesFromPools asks Cluster API's IPAM integration for an address for
+	// this machine, from the pools named here. It is the standard spelling:
+	// an IPAddressClaim is created from each pool, an IPAM provider answers with
+	// an IPAddress, and the address is rendered into the guest's network
+	// configuration as a netplan document -- so the node boots on an address the
+	// provider chose rather than on whatever a DHCP server happens to hand out.
+	//
+	// A control plane's identity is tied to its address -- etcd records the peer
+	// URL it joined with -- which is why this exists: a lease that can move is a
+	// control plane that can be lost on the next reboot.
+	//
+	// When set, it wins over GuestConfig: the pool is the answer to "which
+	// address", and there is only one answer.
+	// +optional
+	AddressesFromPools []ipamv1.IPPoolReference `json:"addressesFromPools,omitempty"`
 
 	// GuestConfig is the cloud-init network configuration (netplan format) to apply inside the VM.
 	// This is passed directly to XO via the NetworkConfig field of CreateVM, allowing the guest

@@ -22,6 +22,43 @@ import (
 	xomachine "github.com/vatesfr/cluster-api-provider-vates/internal/controller/xomachine"
 )
 
+// ipamNetworkConfig claims the machine's address from the IPAM pool its network
+// configuration names, and returns the netplan document that puts that address
+// on the node.
+//
+// A non-nil result means the caller must stop and requeue: the pool has not
+// answered yet, and there is nothing to boot on. The address is not guessed in
+// the meantime -- a machine that boots on a DHCP lease it will not keep is
+// exactly the machine this replaces.
+func (r *XOMachineReconciler) ipamNetworkConfig(ctx context.Context, xoMachine *infrastructurev1beta2.XOMachine) (string, *ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	address, err := xomachine.ClaimedAddress(ctx, r.Client, xoMachine)
+	if err != nil {
+		logger.Error(err, "Failed to claim an address from the IPAM pool")
+		if updateErr := xomachine.UpdateCondition(ctx, r.Client, xoMachine, metav1.ConditionFalse, "AddressClaimFailed", err.Error()); updateErr != nil {
+			logger.Error(updateErr, "Failed to update condition")
+		}
+		return "", nil, err
+	}
+	if address == nil {
+		logger.Info("Waiting for the IPAM pool to answer the address claim", "machine", xoMachine.Name)
+		if updateErr := xomachine.UpdateCondition(ctx, r.Client, xoMachine, metav1.ConditionFalse, "WaitingForAddress",
+			"the IPAM pool has not answered the address claim yet"); updateErr != nil {
+			return "", nil, updateErr
+		}
+		return "", &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	logger.Info("Claimed an address from the IPAM pool", "machine", xoMachine.Name, "address", address.IP)
+	return xomachine.Netplan(address, nodeInterface), nil, nil
+}
+
+// nodeInterface is the interface the node's network configuration names. The
+// node image brings up its first ethernet under this name, and the document has
+// to name the interface the node will actually find.
+const nodeInterface = "eth0"
+
 func (r *XOMachineReconciler) reconcileNormal(ctx context.Context, xoMachine *infrastructurev1beta2.XOMachine) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
@@ -82,6 +119,23 @@ func (r *XOMachineReconciler) reconcileNormal(ctx context.Context, xoMachine *in
 
 	cloudConfig := result.CloudConfig
 	networkConfig := result.NetworkConfig
+
+	// An address claimed from an IPAM pool replaces whatever the machine's own
+	// network configuration said. The pool is the answer to "which address", and
+	// there is only one answer: the node boots on the address the provider chose
+	// rather than on whatever a DHCP server hands out, which is what keeps a
+	// control plane's identity -- and the peer URL etcd recorded for it -- stable
+	// across a reboot.
+	if xoMachine.Spec.NetworkConfig != nil && len(xoMachine.Spec.NetworkConfig.AddressesFromPools) > 0 {
+		doc, wait, claimErr := r.ipamNetworkConfig(ctx, xoMachine)
+		if claimErr != nil {
+			return ctrl.Result{}, claimErr
+		}
+		if wait != nil {
+			return *wait, nil
+		}
+		networkConfig = &doc
+	}
 
 	vmName := r.buildVMName(xoMachine, bsResult)
 
