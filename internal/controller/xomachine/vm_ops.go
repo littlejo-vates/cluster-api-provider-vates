@@ -658,7 +658,7 @@ func ResolveVMIP(ctx context.Context, xoClient *xok8scommon.XoClient, vm *payloa
 	logger := log.FromContext(ctx)
 
 	vmIP := vm.MainIpAddress
-	if vmIP != "" && !strings.HasPrefix(vmIP, "fe80:") {
+	if nodeIPv4(vmIP) {
 		return vmIP
 	}
 
@@ -678,7 +678,7 @@ func ResolveVMIP(ctx context.Context, xoClient *xok8scommon.XoClient, vm *payloa
 			logger.Error(err, "Failed to get VM from V1 API, retrying", "id", vm.ID.String())
 		} else if v1VM != nil {
 			for _, addr := range v1VM.Addresses {
-				if addr != "" && !strings.HasPrefix(addr, "fe80:") && strings.Contains(addr, ".") {
+				if nodeIPv4(addr) {
 					logger.Info("Resolved VM IP from V1 Addresses", "id", vm.ID.String(), "ip", addr)
 					return addr
 				}
@@ -699,6 +699,80 @@ func ResolveVMIP(ctx context.Context, xoClient *xok8scommon.XoClient, vm *payloa
 		}
 		backoff = min(backoff*2, 8*time.Second)
 	}
+}
+
+// nodeIPv4 reports whether addr is usable as a Kubernetes node address.
+//
+// Both link-local families are rejected. IPv4 link-local (169.254/16) is what
+// the DHCP client assigns while it waits for a lease, and IPv6 link-local
+// (fe80::/10) is what the guest tools report first; a node advertising either is
+// unreachable from the API server, and the mistake surfaces much later as a join
+// that never completes. Only dotted-quad addresses are accepted: the node, its
+// peers and the control plane endpoint are all IPv4 in this design.
+func nodeIPv4(addr string) bool {
+	return addr != "" &&
+		!strings.HasPrefix(addr, "fe80:") &&
+		!strings.HasPrefix(addr, "169.254.") &&
+		strings.Contains(addr, ".")
+}
+
+// ResolveVMIPNow returns the VM's IPv4 address from what Xen Orchestra reports
+// right now, without waiting.
+//
+// It is the single-attempt form of ResolveVMIP, for callers that must not block
+// for two minutes. A machine that is already Ready is refreshed on every
+// reconcile, and a reboot in progress leaves the address empty for a while; an
+// empty return therefore means "not known yet", never "no address".
+func ResolveVMIPNow(xoClient *xok8scommon.XoClient, vm *payloads.VM) string {
+	if nodeIPv4(vm.MainIpAddress) {
+		return vm.MainIpAddress
+	}
+	v1Client := xoClient.Client.V1Client()
+	if v1Client == nil {
+		return ""
+	}
+	v1VM, err := v1Client.GetVm(xoclient.Vm{Id: vm.ID.String()})
+	if err != nil || v1VM == nil {
+		return ""
+	}
+	for _, addr := range v1VM.Addresses {
+		if nodeIPv4(addr) {
+			return addr
+		}
+	}
+	return ""
+}
+
+// SetNodeAddress records addr as the machine's InternalIP, reporting whether it
+// changed anything.
+//
+// The address is the one part of a machine's status Xen Orchestra can change
+// behind the controller's back: the guest reports its own address, and a DHCP
+// lease can move across a reboot. Every consumer of the Machine reads it from
+// here -- Cluster API's association with the workload Node, and the cluster
+// endpoint when no VIP is configured -- so a stale address is a wrong address
+// everywhere. An empty addr is ignored: it means the address is not known yet,
+// and overwriting a good one with nothing would turn a stale address into a
+// missing one.
+func SetNodeAddress(xoMachine *infrastructurev1beta2.XOMachine, addr string) bool {
+	if addr == "" {
+		return false
+	}
+	for i, a := range xoMachine.Status.Addresses {
+		if a.Type != corev1.NodeInternalIP {
+			continue
+		}
+		if a.Address == addr {
+			return false
+		}
+		xoMachine.Status.Addresses[i].Address = addr
+		return true
+	}
+	xoMachine.Status.Addresses = append(xoMachine.Status.Addresses, corev1.NodeAddress{
+		Type:    corev1.NodeInternalIP,
+		Address: addr,
+	})
+	return true
 }
 
 // ManageVIFs ensures all desired VIFs are connected and sets the allowed IP

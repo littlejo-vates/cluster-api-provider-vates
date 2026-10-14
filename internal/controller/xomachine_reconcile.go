@@ -222,15 +222,10 @@ func (r *XOMachineReconciler) tryFastPath(ctx context.Context, xoMachine *infras
 				return &ctrl.Result{}, ue
 			}
 		}
-		// Best-effort: keep VM tags up to date (also tags VMs created before
-		// tagging was supported).
-		if xoCreds, err := r.resolveMachineCredentials(ctx, xoMachine); err == nil {
-			if xoClient, err := r.newXOClient(ctx, xoCreds); err == nil && xoClient != nil {
-				if vmID, parseErr := xok8scommon.GetVMID(*xoMachine.Status.ProviderID); parseErr == nil {
-					xomachine.SetVMTags(ctx, xoMachine, vmID, xoClient, xoMachine.Spec.BootstrapProvider)
-				}
-			}
-		}
+		// Best-effort, on every reconcile: keep the VM tags current (also tags
+		// VMs created before tagging existed) and re-read the machine's
+		// address, which Xen Orchestra can have changed since provisioning.
+		r.refreshReadyMachine(ctx, xoMachine)
 		return &ctrl.Result{}, nil
 	}
 
@@ -260,6 +255,50 @@ func (r *XOMachineReconciler) tryFastPath(ctx context.Context, xoMachine *infras
 
 	result, err := r.reconcileExistingVM(ctx, xoMachine, vm, xoClient)
 	return &result, err
+}
+
+// refreshReadyMachine applies the two best-effort updates a Ready machine still
+// needs on every reconcile: its VM tags, and its address.
+//
+// The address is not stable. Xen Orchestra reports the guest's own address, and
+// a DHCP lease can move across a reboot; the Ready fast path is the only place a
+// long-lived machine is looked at, so without this the address stays frozen at
+// the one seen during provisioning. Cluster API publishes it as the workload
+// Node's InternalIP and the cluster endpoint falls back to it, so a stale
+// address is a wrong address for everything downstream.
+//
+// Both updates are best-effort by design: a Ready machine must not be requeued
+// or marked unready because Xen Orchestra was briefly unreachable. The next
+// reconcile retries.
+func (r *XOMachineReconciler) refreshReadyMachine(ctx context.Context, xoMachine *infrastructurev1beta2.XOMachine) {
+	logger := log.FromContext(ctx)
+
+	xoCreds, err := r.resolveMachineCredentials(ctx, xoMachine)
+	if err != nil {
+		return
+	}
+	xoClient, err := r.newXOClient(ctx, xoCreds)
+	if err != nil || xoClient == nil {
+		return
+	}
+	vmID, err := xok8scommon.GetVMID(*xoMachine.Status.ProviderID)
+	if err != nil {
+		return
+	}
+
+	xomachine.SetVMTags(ctx, xoMachine, vmID, xoClient, xoMachine.Spec.BootstrapProvider)
+
+	vm, err := xoClient.Client.VM().GetByID(ctx, vmID)
+	if err != nil {
+		logger.Error(err, "Failed to re-read the VM to refresh its address", "id", vmID.String())
+		return
+	}
+	if !xomachine.SetNodeAddress(xoMachine, xomachine.ResolveVMIPNow(xoClient, vm)) {
+		return
+	}
+	if err := r.Status().Update(ctx, xoMachine); err != nil {
+		logger.Error(err, "Failed to record the machine's refreshed address")
+	}
 }
 
 // reconcileExistingVM handles the fast-path when the VM already exists.
