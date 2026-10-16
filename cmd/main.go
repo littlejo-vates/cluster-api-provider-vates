@@ -45,6 +45,7 @@ import (
 
 	addonsv1 "sigs.k8s.io/cluster-api/api/addons/v1beta2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	ipamv1 "sigs.k8s.io/cluster-api/api/ipam/v1beta2"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -59,6 +60,10 @@ func init() {
 	utilruntime.Must(infrastructurev1beta2.AddToScheme(scheme))
 	utilruntime.Must(clusterv1.AddToScheme(scheme))
 	utilruntime.Must(addonsv1.AddToScheme(scheme))
+	// The XOMachine controller reads IPAddressClaims, so the IPAM types have to
+	// be in the scheme the manager hands its clients. Without this the claim
+	// reads fail with "no kind is registered for the type IPAddressClaim".
+	utilruntime.Must(ipamv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
