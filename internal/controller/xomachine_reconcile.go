@@ -175,7 +175,7 @@ func (r *XOMachineReconciler) reconcileNormal(ctx context.Context, xoMachine *in
 		return ctrl.Result{}, err
 	}
 
-	xomachine.SetVMTags(ctx, xoMachine, vm.ID, xoClient, xoMachine.Spec.BootstrapProvider)
+	xomachine.SetVMTags(ctx, r.Client, xoMachine, vm.ID, xoClient, xoMachine.Spec.BootstrapProvider)
 
 	if !xoMachine.Status.Ready {
 		result, waitErr := xomachine.WaitForVMReady(ctx, r.Client, xoClient, xoMachine, vm)
@@ -340,7 +340,7 @@ func (r *XOMachineReconciler) refreshReadyMachine(ctx context.Context, xoMachine
 		return
 	}
 
-	xomachine.SetVMTags(ctx, xoMachine, vmID, xoClient, xoMachine.Spec.BootstrapProvider)
+	xomachine.SetVMTags(ctx, r.Client, xoMachine, vmID, xoClient, xoMachine.Spec.BootstrapProvider)
 
 	vm, err := xoClient.Client.VM().GetByID(ctx, vmID)
 	if err != nil {

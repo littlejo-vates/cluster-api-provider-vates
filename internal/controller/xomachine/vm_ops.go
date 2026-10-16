@@ -3,6 +3,7 @@ package xomachine
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -99,16 +100,17 @@ func CreateVM(ctx context.Context, c client.Client, xoClient *xok8scommon.XoClie
 	}
 	logger.Info("ProviderID saved", "providerID", providerID)
 
-	SetVMTags(ctx, xoMachine, vm.ID, xoClient, providerName)
+	SetVMTags(ctx, c, xoMachine, vm.ID, xoClient, providerName)
 
 	return vm, nil
 }
 
 // SetVMTags applies identifying tags to the VM so it can be recognized in XO
-// (owning provider, cluster name, CAPI machine name, role, bootstrap provider).
-// Best-effort: errors are logged and the reconcile continues. Idempotent,
-// safe to call on every reconcile.
-func SetVMTags(ctx context.Context, xoMachine *infrastructurev1beta2.XOMachine, vmID uuid.UUID, xoClient *xok8scommon.XoClient, providerName string) {
+// (owning provider, cluster name, CAPI machine name, role, bootstrap provider),
+// followed by the additional tags declared in the XOCluster and XOMachine
+// spec.tags. Best-effort: errors are logged and the reconcile continues.
+// Idempotent, safe to call on every reconcile.
+func SetVMTags(ctx context.Context, c client.Client, xoMachine *infrastructurev1beta2.XOMachine, vmID uuid.UUID, xoClient *xok8scommon.XoClient, providerName string) {
 	logger := log.FromContext(ctx)
 	if xoClient == nil {
 		return
@@ -119,7 +121,7 @@ func SetVMTags(ctx context.Context, xoMachine *infrastructurev1beta2.XOMachine, 
 		return
 	}
 
-	tags := vmTags(xoMachine, providerName)
+	tags := vmTags(xoMachine, providerName, clusterTags(ctx, c, xoMachine))
 	for _, tag := range tags {
 		if err := v1Concrete.AddTag(vmID.String(), tag); err != nil {
 			logger.Info("Failed to set VM tag (will continue)", "id", vmID.String(), "tag", tag, "error", err)
@@ -129,11 +131,31 @@ func SetVMTags(ctx context.Context, xoMachine *infrastructurev1beta2.XOMachine, 
 	logger.Info("Set VM tags", "id", vmID.String(), "tags", tags)
 }
 
-// vmTags builds the identifying tags for a VM. It is always tagged with
-// "vates-capi" (managed by this provider); the "bootstrap:<name>" tag is added
-// only when the XOMachine declares a bootstrap provider name. The name is
-// purely informational: it never drives behavior.
-func vmTags(xoMachine *infrastructurev1beta2.XOMachine, providerName string) []string {
+// clusterTags returns the spec.tags of the XOCluster the machine belongs to.
+// Best-effort: when the XOCluster cannot be found, no cluster tag is applied
+// and the next reconcile retries.
+func clusterTags(ctx context.Context, c client.Client, xoMachine *infrastructurev1beta2.XOMachine) []string {
+	clusterName := xoMachine.Labels[clusterv1.ClusterNameLabel]
+	if c == nil || clusterName == "" {
+		return nil
+	}
+	xoCluster, err := GetXOCluster(ctx, c, xoMachine.Namespace, clusterName)
+	if err != nil {
+		log.FromContext(ctx).Info("Failed to get XOCluster for VM tags (will continue)", "cluster", clusterName, "error", err)
+		return nil
+	}
+	if xoCluster == nil {
+		return nil
+	}
+	return xoCluster.Spec.Tags
+}
+
+// vmTags builds the tags for a VM. It is always tagged with "vates-capi"
+// (managed by this provider); the "bootstrap:<name>" tag is added only when
+// the XOMachine declares a bootstrap provider name. The name is purely
+// informational: it never drives behavior. The user-defined cluster tags,
+// then machine spec.tags, are appended, skipping duplicates.
+func vmTags(xoMachine *infrastructurev1beta2.XOMachine, providerName string, clusterTags []string) []string {
 	role := "worker"
 	if _, ok := xoMachine.Labels[clusterv1.MachineControlPlaneLabel]; ok {
 		role = "control-plane"
@@ -146,6 +168,11 @@ func vmTags(xoMachine *infrastructurev1beta2.XOMachine, providerName string) []s
 	}
 	if providerName != "" {
 		tags = append(tags, "bootstrap:"+providerName)
+	}
+	for _, tag := range slices.Concat(clusterTags, xoMachine.Spec.Tags) {
+		if tag != "" && !slices.Contains(tags, tag) {
+			tags = append(tags, tag)
+		}
 	}
 	return tags
 }

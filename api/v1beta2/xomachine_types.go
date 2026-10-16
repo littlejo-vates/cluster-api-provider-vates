@@ -54,6 +54,18 @@ type XOMachineSpec struct {
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	BootstrapProvider string `json:"bootstrapProvider,omitempty"`
 
+	// Tags are additional Xen Orchestra tags applied to the VM, on top of the
+	// identifying tags set by the controller (vates-capi, cluster-name:<name>,
+	// machine:<name>, role:<role>, bootstrap:<name>) and of the cluster-wide
+	// XOCluster spec.tags. Tags are only added: removing a tag from this list
+	// does not remove it from an existing VM.
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=64
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=255
+	Tags []string `json:"tags,omitempty"`
+
 	// Bootstrap declares how the bootstrap payload from the owner Machine must
 	// be handled by the infrastructure provider. It describes what to do, never
 	// who produced the payload, so adding a bootstrap provider needs no change
