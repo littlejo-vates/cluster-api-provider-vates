@@ -194,6 +194,59 @@ var _ = Describe("Reconcile", func() {
 			Expect(updated.Status.Addresses[0].Address).To(Equal("192.168.1.42"))
 		})
 
+		It("refreshes the address of an already-Ready machine", func() {
+			vmUUID := uuid.Must(uuid.NewV4())
+			poolUUID := uuid.Must(uuid.NewV4())
+			providerID := "xenorchestra://" + poolUUID.String() + "/" + vmUUID.String()
+
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&infrastructurev1beta2.XOMachine{}).WithObjects(
+				&infrastructurev1beta2.XOMachine{
+					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+					Spec: infrastructurev1beta2.XOMachineSpec{
+						NamePrefix: "test",
+						ProviderID: &providerID,
+					},
+					Status: infrastructurev1beta2.XOMachineStatus{
+						Ready:      true,
+						ProviderID: &providerID,
+						Addresses: []corev1.NodeAddress{
+							{Type: corev1.NodeInternalIP, Address: "10.30.1.42"},
+						},
+					},
+				},
+			).Build()
+
+			r = &XOMachineReconciler{
+				Client:  fakeClient,
+				Scheme:  scheme,
+				XoCreds: &xok8scommon.XoConfig{},
+				newClientFunc: func(_ context.Context, _ *xok8scommon.XoConfig) (*xok8scommon.XoClient, error) {
+					return &xok8scommon.XoClient{Client: mockLib}, nil
+				},
+			}
+
+			// The guest comes back on a new lease: the machine is still Ready,
+			// but the address recorded at provisioning time is now stale.
+			mockVM.EXPECT().
+				GetByID(gomock.Any(), vmUUID).
+				Return(&payloads.VM{
+					ID:            vmUUID,
+					PowerState:    payloads.PowerStateRunning,
+					MainIpAddress: "10.30.1.240",
+				}, nil)
+
+			result, err := r.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeZero())
+
+			updated := &infrastructurev1beta2.XOMachine{}
+			Expect(r.Get(ctx, types.NamespacedName{Name: "test", Namespace: "default"}, updated)).To(Succeed())
+			Expect(updated.Status.Addresses).To(HaveLen(1))
+			Expect(updated.Status.Addresses[0].Address).To(Equal("10.30.1.240"))
+		})
+
 		It("sets the disk size when DiskSize is set", func() {
 			vmUUID := uuid.Must(uuid.NewV4())
 			poolUUID := uuid.Must(uuid.NewV4())

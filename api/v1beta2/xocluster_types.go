@@ -35,6 +35,17 @@ type XOClusterSpec struct {
 	// +optional
 	IdentityRef *corev1.LocalObjectReference `json:"identityRef,omitempty"`
 
+	// Tags are additional Xen Orchestra tags applied to every VM of the
+	// cluster, on top of the identifying tags set by the controller and of
+	// the machine-level XOMachine spec.tags. Tags are only added: removing a
+	// tag from this list does not remove it from existing VMs.
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=64
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=255
+	Tags []string `json:"tags,omitempty"`
+
 	// Addons selects which workload cluster addons the controller installs
 	// via ClusterResourceSet. When nil, defaults to CCM and CSI enabled and
 	// no CNI.

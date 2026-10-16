@@ -3,6 +3,7 @@ package xomachine
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -99,16 +100,17 @@ func CreateVM(ctx context.Context, c client.Client, xoClient *xok8scommon.XoClie
 	}
 	logger.Info("ProviderID saved", "providerID", providerID)
 
-	SetVMTags(ctx, xoMachine, vm.ID, xoClient, providerName)
+	SetVMTags(ctx, c, xoMachine, vm.ID, xoClient, providerName)
 
 	return vm, nil
 }
 
 // SetVMTags applies identifying tags to the VM so it can be recognized in XO
-// (owning provider, cluster name, CAPI machine name, role, bootstrap provider).
-// Best-effort: errors are logged and the reconcile continues. Idempotent,
-// safe to call on every reconcile.
-func SetVMTags(ctx context.Context, xoMachine *infrastructurev1beta2.XOMachine, vmID uuid.UUID, xoClient *xok8scommon.XoClient, providerName string) {
+// (owning provider, cluster name, CAPI machine name, role, bootstrap provider),
+// followed by the additional tags declared in the XOCluster and XOMachine
+// spec.tags. Best-effort: errors are logged and the reconcile continues.
+// Idempotent, safe to call on every reconcile.
+func SetVMTags(ctx context.Context, c client.Client, xoMachine *infrastructurev1beta2.XOMachine, vmID uuid.UUID, xoClient *xok8scommon.XoClient, providerName string) {
 	logger := log.FromContext(ctx)
 	if xoClient == nil {
 		return
@@ -119,7 +121,7 @@ func SetVMTags(ctx context.Context, xoMachine *infrastructurev1beta2.XOMachine, 
 		return
 	}
 
-	tags := vmTags(xoMachine, providerName)
+	tags := vmTags(xoMachine, providerName, clusterTags(ctx, c, xoMachine))
 	for _, tag := range tags {
 		if err := v1Concrete.AddTag(vmID.String(), tag); err != nil {
 			logger.Info("Failed to set VM tag (will continue)", "id", vmID.String(), "tag", tag, "error", err)
@@ -129,11 +131,31 @@ func SetVMTags(ctx context.Context, xoMachine *infrastructurev1beta2.XOMachine, 
 	logger.Info("Set VM tags", "id", vmID.String(), "tags", tags)
 }
 
-// vmTags builds the identifying tags for a VM. It is always tagged with
-// "vates-capi" (managed by this provider); the "bootstrap:<name>" tag is added
-// only when the XOMachine declares a bootstrap provider name. The name is
-// purely informational: it never drives behavior.
-func vmTags(xoMachine *infrastructurev1beta2.XOMachine, providerName string) []string {
+// clusterTags returns the spec.tags of the XOCluster the machine belongs to.
+// Best-effort: when the XOCluster cannot be found, no cluster tag is applied
+// and the next reconcile retries.
+func clusterTags(ctx context.Context, c client.Client, xoMachine *infrastructurev1beta2.XOMachine) []string {
+	clusterName := xoMachine.Labels[clusterv1.ClusterNameLabel]
+	if c == nil || clusterName == "" {
+		return nil
+	}
+	xoCluster, err := GetXOCluster(ctx, c, xoMachine.Namespace, clusterName)
+	if err != nil {
+		log.FromContext(ctx).Info("Failed to get XOCluster for VM tags (will continue)", "cluster", clusterName, "error", err)
+		return nil
+	}
+	if xoCluster == nil {
+		return nil
+	}
+	return xoCluster.Spec.Tags
+}
+
+// vmTags builds the tags for a VM. It is always tagged with "vates-capi"
+// (managed by this provider); the "bootstrap:<name>" tag is added only when
+// the XOMachine declares a bootstrap provider name. The name is purely
+// informational: it never drives behavior. The user-defined cluster tags,
+// then machine spec.tags, are appended, skipping duplicates.
+func vmTags(xoMachine *infrastructurev1beta2.XOMachine, providerName string, clusterTags []string) []string {
 	role := "worker"
 	if _, ok := xoMachine.Labels[clusterv1.MachineControlPlaneLabel]; ok {
 		role = "control-plane"
@@ -146,6 +168,11 @@ func vmTags(xoMachine *infrastructurev1beta2.XOMachine, providerName string) []s
 	}
 	if providerName != "" {
 		tags = append(tags, "bootstrap:"+providerName)
+	}
+	for _, tag := range slices.Concat(clusterTags, xoMachine.Spec.Tags) {
+		if tag != "" && !slices.Contains(tags, tag) {
+			tags = append(tags, tag)
+		}
 	}
 	return tags
 }
@@ -658,7 +685,7 @@ func ResolveVMIP(ctx context.Context, xoClient *xok8scommon.XoClient, vm *payloa
 	logger := log.FromContext(ctx)
 
 	vmIP := vm.MainIpAddress
-	if vmIP != "" && !strings.HasPrefix(vmIP, "fe80:") {
+	if nodeIPv4(vmIP) {
 		return vmIP
 	}
 
@@ -678,7 +705,7 @@ func ResolveVMIP(ctx context.Context, xoClient *xok8scommon.XoClient, vm *payloa
 			logger.Error(err, "Failed to get VM from V1 API, retrying", "id", vm.ID.String())
 		} else if v1VM != nil {
 			for _, addr := range v1VM.Addresses {
-				if addr != "" && !strings.HasPrefix(addr, "fe80:") && strings.Contains(addr, ".") {
+				if nodeIPv4(addr) {
 					logger.Info("Resolved VM IP from V1 Addresses", "id", vm.ID.String(), "ip", addr)
 					return addr
 				}
@@ -699,6 +726,80 @@ func ResolveVMIP(ctx context.Context, xoClient *xok8scommon.XoClient, vm *payloa
 		}
 		backoff = min(backoff*2, 8*time.Second)
 	}
+}
+
+// nodeIPv4 reports whether addr is usable as a Kubernetes node address.
+//
+// Both link-local families are rejected. IPv4 link-local (169.254/16) is what
+// the DHCP client assigns while it waits for a lease, and IPv6 link-local
+// (fe80::/10) is what the guest tools report first; a node advertising either is
+// unreachable from the API server, and the mistake surfaces much later as a join
+// that never completes. Only dotted-quad addresses are accepted: the node, its
+// peers and the control plane endpoint are all IPv4 in this design.
+func nodeIPv4(addr string) bool {
+	return addr != "" &&
+		!strings.HasPrefix(addr, "fe80:") &&
+		!strings.HasPrefix(addr, "169.254.") &&
+		strings.Contains(addr, ".")
+}
+
+// ResolveVMIPNow returns the VM's IPv4 address from what Xen Orchestra reports
+// right now, without waiting.
+//
+// It is the single-attempt form of ResolveVMIP, for callers that must not block
+// for two minutes. A machine that is already Ready is refreshed on every
+// reconcile, and a reboot in progress leaves the address empty for a while; an
+// empty return therefore means "not known yet", never "no address".
+func ResolveVMIPNow(xoClient *xok8scommon.XoClient, vm *payloads.VM) string {
+	if nodeIPv4(vm.MainIpAddress) {
+		return vm.MainIpAddress
+	}
+	v1Client := xoClient.Client.V1Client()
+	if v1Client == nil {
+		return ""
+	}
+	v1VM, err := v1Client.GetVm(xoclient.Vm{Id: vm.ID.String()})
+	if err != nil || v1VM == nil {
+		return ""
+	}
+	for _, addr := range v1VM.Addresses {
+		if nodeIPv4(addr) {
+			return addr
+		}
+	}
+	return ""
+}
+
+// SetNodeAddress records addr as the machine's InternalIP, reporting whether it
+// changed anything.
+//
+// The address is the one part of a machine's status Xen Orchestra can change
+// behind the controller's back: the guest reports its own address, and a DHCP
+// lease can move across a reboot. Every consumer of the Machine reads it from
+// here -- Cluster API's association with the workload Node, and the cluster
+// endpoint when no VIP is configured -- so a stale address is a wrong address
+// everywhere. An empty addr is ignored: it means the address is not known yet,
+// and overwriting a good one with nothing would turn a stale address into a
+// missing one.
+func SetNodeAddress(xoMachine *infrastructurev1beta2.XOMachine, addr string) bool {
+	if addr == "" {
+		return false
+	}
+	for i, a := range xoMachine.Status.Addresses {
+		if a.Type != corev1.NodeInternalIP {
+			continue
+		}
+		if a.Address == addr {
+			return false
+		}
+		xoMachine.Status.Addresses[i].Address = addr
+		return true
+	}
+	xoMachine.Status.Addresses = append(xoMachine.Status.Addresses, corev1.NodeAddress{
+		Type:    corev1.NodeInternalIP,
+		Address: addr,
+	})
+	return true
 }
 
 // ManageVIFs ensures all desired VIFs are connected and sets the allowed IP

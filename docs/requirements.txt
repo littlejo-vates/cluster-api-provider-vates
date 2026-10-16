@@ -1,0 +1,6 @@
+# Documentation build dependencies.
+#
+# The site is built with Zensical, the successor to Material for MkDocs.
+# It reads the standard mkdocs.yml at the repository root, so the project can
+# also be built with MkDocs Material as a fallback by swapping the command.
+zensical>=0.0.69,<1.0
