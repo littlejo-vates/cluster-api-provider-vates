@@ -256,6 +256,20 @@ spec:
                               in Kubernetes resource format (e.g. "8Gi", "8192Mi").
                             type: string
                         type: object
+                      tags:
+                        description: |-
+                          Tags are additional Xen Orchestra tags applied to the VM, on top of the
+                          identifying tags set by the controller (vates-capi, cluster-name:<name>,
+                          machine:<name>, role:<role>, bootstrap:<name>) and of the cluster-wide
+                          XOCluster spec.tags. Tags are only added: removing a tag from this list
+                          does not remove it from an existing VM.
+                        items:
+                          maxLength: 255
+                          minLength: 1
+                          type: string
+                        maxItems: 64
+                        type: array
+                        x-kubernetes-list-type: set
                       templateID:
                         description: TemplateID is the XO VM template UUID to clone.
                         type: string

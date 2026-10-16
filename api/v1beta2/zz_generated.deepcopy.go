@@ -279,6 +279,11 @@ func (in *XOClusterSpec) DeepCopyInto(out *XOClusterSpec) {
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
+	if in.Tags != nil {
+		in, out := &in.Tags, &out.Tags
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Addons != nil {
 		in, out := &in.Addons, &out.Addons
 		*out = new(AddonsSpec)
@@ -525,6 +530,11 @@ func (in *XOMachineSpec) DeepCopyInto(out *XOMachineSpec) {
 		in, out := &in.FailureDomain, &out.FailureDomain
 		*out = new(string)
 		**out = **in
+	}
+	if in.Tags != nil {
+		in, out := &in.Tags, &out.Tags
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	if in.Bootstrap != nil {
 		in, out := &in.Bootstrap, &out.Bootstrap
